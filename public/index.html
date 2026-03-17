@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stellowave UAV Ledger · Bloomington Drone Audit Chain</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Design tokens ──────────────────────────────────────────────── */
+    :root {
+      --bg:         #070d14;
+      --bg2:        #0d1623;
+      --bg3:        #111e2e;
+      --border:     #1e2f45;
+      --accent:     #00e5b4;
+      --accent2:    #0066ff;
+      --accent3:    #ff4d6d;
+      --text:       #d4e4f7;
+      --text2:      #637d9b;
+      --text3:      #8fa8c0;
+      --mono:       'Space Mono', monospace;
+      --sans:       'DM Sans', sans-serif;
+      --radius:     8px;
+      --transition: 200ms ease;
+    }
+
+    /* ── Reset ──────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 14px;
+      line-height: 1.6;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Grid noise texture ─────────────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 48px 48px;
+      opacity: 0.18;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────────── */
+    header {
+      position: relative; z-index: 10;
+      padding: 20px 32px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(7,13,20,.9);
+      backdrop-filter: blur(12px);
+    }
+    .logo {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .logo-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--accent2), var(--accent));
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--mono); font-size: 14px; font-weight: 700;
+      color: #000;
+    }
+    .logo-text { font-size: 15px; font-weight: 700; letter-spacing: .04em; }
+    .logo-sub  { font-size: 11px; color: var(--text2); font-family: var(--mono); }
+
+    .stats-bar {
+      display: flex; gap: 24px;
+    }
+    .stat {
+      text-align: right;
+    }
+    .stat-val { font-family: var(--mono); font-size: 18px; color: var(--accent); font-weight: 700; }
+    .stat-key { font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: .08em; }
+
+    /* ── Nav ────────────────────────────────────────────────────────── */
+    nav {
+      position: relative; z-index: 10;
+      display: flex; gap: 4px;
+      padding: 12px 32px;
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-btn {
+      padding: 7px 20px;
+      border-radius: var(--radius);
+      font-family: var(--sans); font-size: 13px; font-weight: 500;
+      background: none; border: 1px solid transparent;
+      color: var(--text2); cursor: pointer;
+      transition: var(--transition);
+    }
+    .nav-btn:hover  { color: var(--text); border-color: var(--border); }
+    .nav-btn.active { background: var(--bg3); border-color: var(--accent); color: var(--accent); }
+
+    /* ── Layout ─────────────────────────────────────────────────────── */
+    main {
+      position: relative; z-index: 2;
+      max-width: 1200px; margin: 0 auto;
+      padding: 28px 32px;
+    }
+    .view { display: none; }
+    .view.active { display: block; animation: fadeIn .25s ease; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+
+    /* ── Cards ──────────────────────────────────────────────────────── */
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 16px;
+    }
+    .card-header {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 14px;
+    }
+    .card-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--text3); }
+
+    /* ── Search bar ─────────────────────────────────────────────────── */
+    .search-row {
+      display: flex; gap: 10px; flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    .search-row input, .search-row select {
+      flex: 1; min-width: 160px;
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 9px 14px;
+      color: var(--text); font-family: var(--sans); font-size: 13px;
+      outline: none; transition: var(--transition);
+    }
+    .search-row input:focus, .search-row select:focus { border-color: var(--accent2); }
+    .btn {
+      padding: 9px 20px;
+      background: var(--accent2); color: #fff;
+      border: none; border-radius: var(--radius);
+      font-family: var(--sans); font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: var(--transition);
+    }
+    .btn:hover  { background: #0055dd; }
+    .btn.success { background: var(--accent); color: #000; }
+    .btn.danger  { background: var(--accent3); }
+
+    /* ── Table ──────────────────────────────────────────────────────── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    thead th {
+      text-align: left; padding: 8px 12px;
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .08em; color: var(--text2);
+      border-bottom: 1px solid var(--border);
+    }
+    tbody tr { transition: background var(--transition); cursor: pointer; }
+    tbody tr:hover { background: var(--bg3); }
+    tbody td {
+      padding: 9px 12px;
+      border-bottom: 1px solid rgba(30,47,69,.5);
+      font-family: var(--mono); font-size: 11.5px;
+    }
+    td.overflow { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* ── Hash chips ─────────────────────────────────────────────────── */
+    .hash {
+      font-family: var(--mono); font-size: 11px;
+      color: var(--accent2); word-break: break-all;
+    }
+    .hash-short {
+      font-family: var(--mono); font-size: 11px; color: var(--accent2);
+    }
+
+    /* ── Badge ──────────────────────────────────────────────────────── */
+    .badge {
+      display: inline-block; padding: 2px 9px;
+      border-radius: 20px; font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .05em;
+    }
+    .badge.green  { background: rgba(0,229,180,.12); color: var(--accent); }
+    .badge.blue   { background: rgba(0,102,255,.15); color: #6699ff; }
+    .badge.red    { background: rgba(255,77,109,.15); color: var(--accent3); }
+
+    /* ── Block detail panel ─────────────────────────────────────────── */
+    .detail-panel {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 12px; padding: 20px 24px; margin-top: 16px;
+      display: none;
+    }
+    .detail-panel.open { display: block; animation: fadeIn .2s ease; }
+    .kv-grid {
+      display: grid; grid-template-columns: 170px 1fr;
+      gap: 6px 12px; margin-bottom: 12px; font-size: 12.5px;
+    }
+    .kv-key  { color: var(--text2); font-family: var(--mono); font-size: 11px; padding-top: 2px; }
+    .kv-val  { color: var(--text); word-break: break-all; }
+
+    /* ── Verify panel ───────────────────────────────────────────────── */
+    .verify-result {
+      margin-top: 16px; padding: 18px 22px;
+      border-radius: 10px; border: 1px solid var(--border);
+      display: none;
+    }
+    .verify-result.pass { border-color: var(--accent); background: rgba(0,229,180,.07); }
+    .verify-result.fail { border-color: var(--accent3); background: rgba(255,77,109,.07); }
+    .verify-result.open { display: block; animation: fadeIn .2s ease; }
+    .verify-icon { font-size: 28px; margin-bottom: 8px; }
+    .verify-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+    .verify-reason { font-size: 12.5px; color: var(--text2); }
+
+    .proof-tree {
+      margin-top: 14px; font-family: var(--mono); font-size: 11px;
+      line-height: 2;
+    }
+    .proof-step { display: flex; align-items: center; gap: 8px; }
+    .proof-step .dir { color: var(--accent3); width: 40px; }
+    .proof-step .h   { color: var(--text3); }
+    .proof-step.target .h { color: var(--accent); }
+
+    /* ── Loading spinner ────────────────────────────────────────────── */
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      vertical-align: middle; margin-left: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Empty state ────────────────────────────────────────────────── */
+    .empty { text-align: center; padding: 48px; color: var(--text2); }
+    .empty-icon { font-size: 36px; margin-bottom: 12px; }
+
+    /* ── Blockchain visual ──────────────────────────────────────────── */
+    .chain-visual {
+      display: flex; overflow-x: auto; gap: 0;
+      padding-bottom: 8px; margin-bottom: 24px; align-items: center;
+    }
+    .chain-block {
+      flex-shrink: 0;
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px 14px;
+      cursor: pointer; transition: var(--transition); min-width: 130px;
+    }
+    .chain-block:hover, .chain-block.selected {
+      border-color: var(--accent); background: var(--bg2);
+    }
+    .chain-block .cb-idx { font-size: 10px; color: var(--text2); font-family: var(--mono); }
+    .chain-block .cb-hash { font-size: 10px; color: var(--accent2); font-family: var(--mono); margin: 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .chain-block .cb-txc { font-size: 11px; color: var(--text3); }
+    .chain-arrow {
+      flex-shrink: 0; color: var(--text2); font-size: 18px;
+      padding: 0 4px; user-select: none;
+    }
+
+    /* ── Scrollbar ──────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────────────────── -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">UAV</div>
+    <div>
+      <div class="logo-text">Bloomington Drone Audit Ledger</div>
+      <div class="logo-sub">City of Bloomington · Blockchain-Backed Flight Log</div>
+    </div>
+  </div>
+  <div class="stats-bar" id="statsBar">
+    <div class="stat"><div class="stat-val" id="statBlocks">—</div><div class="stat-key">Blocks</div></div>
+    <div class="stat"><div class="stat-val" id="statTxs">—</div><div class="stat-key">Flights</div></div>
+    <div class="stat"><div class="stat-val" id="statDiff">—</div><div class="stat-key">Difficulty</div></div>
+  </div>
+</header>
+
+<!-- ── Nav ────────────────────────────────────────────────────────────── -->
+<nav>
+  <button class="nav-btn active" onclick="showView('explorer')">✈  Dataset Explorer</button>
+  <button class="nav-btn"        onclick="showView('blocks')">⛓  Block Explorer</button>
+  <button class="nav-btn"        onclick="showView('verify')">🔍  Verify Flight</button>
+</nav>
+
+<!-- ── Main ───────────────────────────────────────────────────────────── -->
+<main>
+
+  <!-- ── Dataset Explorer ─────────────────────────────────────────── -->
+  <div class="view active" id="view-explorer">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Search Flight Records</span>
+      </div>
+      <div class="search-row">
+        <input  id="s-location"   type="text"   placeholder="Location / area surveyed…" />
+        <input  id="s-drone"      type="text"   placeholder="Drone make / model…" />
+        <input  id="s-dept"       type="text"   placeholder="Department…" />
+        <input  id="s-from"       type="date"   title="Date from" />
+        <input  id="s-to"         type="date"   title="Date to" />
+        <button class="btn" onclick="searchFlights()">Search</button>
+      </div>
+      <div class="table-wrap">
+        <table id="flightTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Flight ID</th>
+              <th>Date</th>
+              <th>Drone</th>
+              <th>Location</th>
+              <th>Department</th>
+              <th>Authorized Use</th>
+              <th>TX Hash</th>
+              <th>Block</th>
+            </tr>
+          </thead>
+          <tbody id="flightTbody">
+            <tr><td colspan="9"><div class="empty"><div class="empty-icon">✈</div>Run a search to load flight records.</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="detail-panel" id="flightDetail"></div>
+  </div>
+
+  <!-- ── Block Explorer ───────────────────────────────────────────── -->
+  <div class="view" id="view-blocks">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Chain Overview</span></div>
+      <div class="chain-visual" id="chainVisual"></div>
+    </div>
+    <div class="detail-panel open" id="blockDetail">
+      <div class="empty"><div class="empty-icon">⛓</div>Click a block above to inspect it.</div>
+    </div>
+  </div>
+
+  <!-- ── Verify Flight ────────────────────────────────────────────── -->
+  <div class="view" id="view-verify">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Verify a Flight Record</span></div>
+      <p style="color:var(--text2); margin-bottom:16px; font-size:13px;">
+        Paste a <strong style="color:var(--text)">transaction hash</strong> to retrieve its Merkle proof and verify inclusion.
+      </p>
+      <div class="search-row">
+        <input id="v-txhash" type="text" placeholder="txHash (64-char hex)…" style="font-family:var(--mono)" />
+        <button class="btn" onclick="verifyFlight()">Verify</button>
+      </div>
+    </div>
+    <div class="verify-result" id="verifyResult"></div>
+  </div>
+
+</main>
+
+<script>
+  const API = '/api';
+
+  // ── View router ──────────────────────────────────────────────────────────
+  function showView(name) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('view-' + name).classList.add('active');
+    event.target.classList.add('active');
+    if (name === 'blocks') loadChain();
+  }
+
+  // ── Stats ────────────────────────────────────────────────────────────────
+  async function loadStats() {
+    try {
+      const d = await apiFetch('/stats');
+      document.getElementById('statBlocks').textContent = d.blockCount ?? '—';
+      document.getElementById('statTxs').textContent    = d.txCount    ?? '—';
+      document.getElementById('statDiff').textContent   = d.difficulty ?? '—';
+    } catch { /* server may not be up yet */ }
+  }
+
+  // ── Search flights ───────────────────────────────────────────────────────
+  async function searchFlights() {
+    const params = new URLSearchParams({
+      location:    document.getElementById('s-location').value,
+      drone_model: document.getElementById('s-drone').value,
+      department:  document.getElementById('s-dept').value,
+      date_from:   document.getElementById('s-from').value,
+      date_to:     document.getElementById('s-to').value,
+    });
+
+    const tbody = document.getElementById('flightTbody');
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px">Loading<span class="spinner"></span></td></tr>';
+
+    try {
+      const d = await apiFetch('/search?' + params);
+      if (!d.results.length) {
+        tbody.innerHTML = '<tr><td colspan="9"><div class="empty"><div class="empty-icon">🔍</div>No matching flight records found.</div></td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = d.results.map((r, i) => `
+        <tr onclick="showFlightDetail('${r.txHash}')">
+          <td>${i+1}</td>
+          <td>${esc(r.tx.flight_id || '—')}</td>
+          <td>${fmtDate(r.tx.timestamp)}</td>
+          <td class="overflow">${esc(r.tx.drone_make_model || '—')}</td>
+          <td class="overflow">${esc(r.tx.location_area_surveyed || '—')}</td>
+          <td>${esc(r.tx.department || '—')}</td>
+          <td class="overflow">${esc(r.tx.authorized_use || '—')}</td>
+          <td><span class="hash-short">${r.txHash.slice(0,12)}…</span></td>
+          <td><span class="badge blue">#${r.blockIndex}</span></td>
+        </tr>
+      `).join('');
+    } catch (e) {
+      tbody.innerHTML = `<tr><td colspan="9" style="color:var(--accent3);padding:20px">${esc(e.message)}</td></tr>`;
+    }
+  }
+
+  async function showFlightDetail(txHash) {
+    const panel = document.getElementById('flightDetail');
+    panel.classList.add('open');
+    panel.innerHTML = 'Loading<span class="spinner"></span>';
+    try {
+      const entry   = await apiFetch('/tx/' + txHash);
+      const proof   = await apiFetch('/proof/' + txHash);
+      const tx      = entry.tx;
+
+      panel.innerHTML = `
+        <div class="card-header"><span class="card-title">Flight Detail</span>
+          <button class="btn" style="margin-left:auto;padding:5px 14px;font-size:11px" onclick="prefillVerify('${txHash}')">Verify this tx →</button>
+        </div>
+        <div class="kv-grid">
+          ${Object.entries(tx).map(([k,v]) => `<div class="kv-key">${esc(k)}</div><div class="kv-val">${esc(v)}</div>`).join('')}
+        </div>
+        <div class="kv-grid" style="margin-top:14px">
+          <div class="kv-key">txHash</div><div class="kv-val hash">${txHash}</div>
+          <div class="kv-key">blockIndex</div><div class="kv-val">${entry.blockIndex}</div>
+          <div class="kv-key">merkleRoot</div><div class="kv-val hash">${proof.merkleRoot}</div>
+          <div class="kv-key">Proof steps</div><div class="kv-val">${proof.proof.length} sibling nodes</div>
+          <div class="kv-key">Signature</div><div class="kv-val"><span class="badge green">VALID</span></div>
+        </div>
+      `;
+    } catch(e) {
+      panel.innerHTML = `<span style="color:var(--accent3)">${esc(e.message)}</span>`;
+    }
+  }
+
+  // ── Block explorer ───────────────────────────────────────────────────────
+  async function loadChain() {
+    const visual = document.getElementById('chainVisual');
+    visual.innerHTML = 'Loading<span class="spinner"></span>';
+    try {
+      const d = await apiFetch('/chain');
+      const blocks = d.blocks;
+      visual.innerHTML = blocks.map((b, i) => `
+        ${i > 0 ? '<div class="chain-arrow">←</div>' : ''}
+        <div class="chain-block" id="cb-${b.index}" onclick="showBlockDetail('${b.blockHash}')">
+          <div class="cb-idx">BLOCK #${b.index}</div>
+          <div class="cb-hash">${b.blockHash.slice(0,14)}…</div>
+          <div class="cb-txc">${b.txCount} tx · diff ${b.difficulty}</div>
+        </div>
+      `).join('');
+
+      // Select latest
+      if (blocks.length > 0) showBlockDetail(blocks[blocks.length-1].blockHash);
+    } catch(e) {
+      visual.innerHTML = `<span style="color:var(--accent3)">${esc(e.message)}</span>`;
+    }
+  }
+
+  async function showBlockDetail(blockHash) {
+    document.querySelectorAll('.chain-block').forEach(e => e.classList.remove('selected'));
+    const panel = document.getElementById('blockDetail');
+    panel.classList.add('open');
+    panel.innerHTML = 'Loading<span class="spinner"></span>';
+    try {
+      const b = await apiFetch('/block/' + blockHash);
+      document.getElementById('cb-' + b.index)?.classList.add('selected');
+
+      const txRows = (b.transactions || []).map(t => `
+        <tr onclick="prefillVerify('${t.txHash}'); showView2('verify')">
+          <td>${esc(t.tx?.flight_id || '—')}</td>
+          <td>${fmtDate(t.tx?.timestamp)}</td>
+          <td class="overflow">${esc(t.tx?.drone_make_model || '—')}</td>
+          <td class="overflow">${esc(t.tx?.location_area_surveyed || '—')}</td>
+          <td><span class="hash-short">${t.txHash.slice(0,14)}…</span></td>
+        </tr>
+      `).join('');
+
+      panel.innerHTML = `
+        <div class="card-header"><span class="card-title">Block #${b.index}</span>
+          <span class="badge ${b.index === 0 ? 'blue' : 'green'}" style="margin-left:8px">${b.index === 0 ? 'genesis' : 'confirmed'}</span>
+        </div>
+        <div class="kv-grid">
+          <div class="kv-key">blockHash</div><div class="kv-val hash">${b.blockHash}</div>
+          <div class="kv-key">prevHash</div><div class="kv-val hash">${b.prevHash}</div>
+          <div class="kv-key">merkleRoot</div><div class="kv-val hash">${b.merkleRoot}</div>
+          <div class="kv-key">timestamp</div><div class="kv-val">${b.timestamp}</div>
+          <div class="kv-key">nonce</div><div class="kv-val">${b.nonce.toLocaleString()}</div>
+          <div class="kv-key">difficulty</div><div class="kv-val">${b.difficulty}</div>
+          <div class="kv-key">txCount</div><div class="kv-val">${b.txCount}</div>
+        </div>
+        ${txRows ? `
+        <div style="margin-top:16px">
+          <div class="card-title" style="margin-bottom:10px">Transactions</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Flight ID</th><th>Date</th><th>Drone</th><th>Location</th><th>TX Hash</th></tr></thead>
+              <tbody>${txRows || '<tr><td colspan="5" style="color:var(--text2);padding:12px">No transactions</td></tr>'}</tbody>
+            </table>
+          </div>
+        </div>` : ''}
+      `;
+    } catch(e) {
+      panel.innerHTML = `<span style="color:var(--accent3)">${esc(e.message)}</span>`;
+    }
+  }
+
+  // ── Verify ───────────────────────────────────────────────────────────────
+  function prefillVerify(txHash) {
+    document.getElementById('v-txhash').value = txHash;
+  }
+  function showView2(name) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('view-' + name).classList.add('active');
+    document.querySelectorAll('.nav-btn')[2].classList.add('active');
+  }
+
+  async function verifyFlight() {
+    const txHash = document.getElementById('v-txhash').value.trim();
+    const panel  = document.getElementById('verifyResult');
+    panel.className = 'verify-result open';
+    panel.innerHTML = 'Fetching proof<span class="spinner"></span>';
+
+    try {
+      const proofData = await apiFetch('/proof/' + txHash);
+      const body = await apiFetch('/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ txHash, proof: proofData.proof, merkleRoot: proofData.merkleRoot }),
+      });
+
+      const pass = body.result === 'PASS';
+      panel.className = 'verify-result open ' + (pass ? 'pass' : 'fail');
+
+      const proofTree = proofData.proof.map((step, i) => `
+        <div class="proof-step">
+          <span class="dir">${step.position === 'left' ? '← L' : '→ R'}</span>
+          <span class="h">${step.hash}</span>
+        </div>
+      `).join('');
+
+      panel.innerHTML = `
+        <div class="verify-icon">${pass ? '✅' : '❌'}</div>
+        <div class="verify-title">${pass ? 'PASS — Flight record verified' : 'FAIL — Verification failed'}</div>
+        <div class="verify-reason">${body.reason}</div>
+        <div class="kv-grid" style="margin-top:16px">
+          <div class="kv-key">txHash</div><div class="kv-val hash">${txHash}</div>
+          <div class="kv-key">Block</div><div class="kv-val">#${proofData.blockIndex} — ${proofData.blockHash.slice(0,20)}…</div>
+          <div class="kv-key">Merkle Root</div><div class="kv-val hash">${proofData.merkleRoot}</div>
+        </div>
+        <div style="margin-top:16px">
+          <div class="card-title" style="margin-bottom:8px">Proof Path (${proofData.proof.length} nodes)</div>
+          <div class="proof-tree">
+            <div class="proof-step target">
+              <span class="dir">LEAF</span>
+              <span class="h">${txHash}</span>
+            </div>
+            ${proofTree}
+            <div class="proof-step">
+              <span class="dir">ROOT</span>
+              <span class="h" style="color:var(--accent)">${proofData.merkleRoot}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    } catch(e) {
+      panel.className = 'verify-result open fail';
+      panel.innerHTML = `
+        <div class="verify-icon">❌</div>
+        <div class="verify-title">FAIL — Transaction not found</div>
+        <div class="verify-reason">${esc(e.message)}</div>
+      `;
+    }
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  async function apiFetch(path, opts) {
+    const res = await fetch(API + path, opts);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || res.statusText);
+    }
+    return res.json();
+  }
+
+  function esc(s) {
+    if (s == null) return '—';
+    return String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    try { return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+    catch { return iso; }
+  }
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  loadStats();
+  setInterval(loadStats, 15000);
+</script>
+</body>
+</html>

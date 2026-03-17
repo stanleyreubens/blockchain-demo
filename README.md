@@ -1,109 +1,224 @@
-# Blockchain Demo
-A web-based demonstration of blockchain concepts.
+# Bloomington UAV Blockchain Audit Ledger
 
-[![Blockchain 101 - Demo](https://img.youtube.com/vi/_160oMzblY8/0.jpg)](https://www.youtube.com/watch?v=_160oMzblY8)
+A blockchain-backed audit log for the City of Bloomington drone program.  
+Each UAV flight record from the public dataset becomes a signed, hashed, and Merkle-provable transaction anchored to an immutable chain of blocks.
 
-This is a very basic visual introduction to the concepts behind a blockchain. We introduce 
-the idea of an immutable ledger using an interactive web demo that is available here:
+Built for **COSC890** — forked from [anders94/blockchain-demo](https://github.com/anders94/blockchain-demo), with all blockchain logic implemented from scratch.
 
-http://andersbrownworth.com/blockchain/
+---
 
-## Setup
-Get the code:
+## Features
 
-```
-git clone https://github.com/anders94/blockchain-demo.git
-```
+- **Data pipeline** — downloads the UAV Flight Log in XML and CSV; converts each record to a deterministic canonical JSON transaction
+- **SHA-256 hashing** — every transaction and block header is hashed with SHA-256
+- **Proof-of-Work** — adjustable difficulty (leading hex zeros)
+- **Merkle trees** — inclusion proofs for any flight record
+- **ECDSA signing** — P-256 key pairs; every transaction is signed by `CityIssuer`
+- **Chain validation** — checks PoW, hash links, Merkle roots, and all signatures
+- **P2P networking** — 3-node simulation with fork resolution (heaviest-chain rule)
+- **REST API** — chain, block, tx, proof, verify, search, stats endpoints
+- **Explorer UI** — Dataset Explorer, Block Explorer, Verify Flight views
 
-Install dependencies:
+---
 
-```
-cd blockchain-demo
+## Requirements
+
+- Node.js ≥ 18
+- npm ≥ 9
+
+---
+
+## Installation
+
+```bash
+git clone <your-fork-url>
+cd blockchain-uav
 npm install
+cp .env.example .env
 ```
-Run the server:
 
+---
+
+## Quick Start
+
+### 1. Generate keys
+
+```bash
+node scripts/keygen.js
 ```
+
+Creates `CityIssuer` and `Auditor` key pairs under `keys/`.
+
+### 2. Ingest the dataset
+
+```bash
+# Download XML (default)
+npm run ingest
+
+# Or download CSV
+node scripts/ingest.js --format=csv
+
+# Download both formats
+node scripts/ingest.js --format=both
+```
+
+Outputs:
+- `data/raw/<timestamp>.xml` (or `.csv`) — raw snapshot
+- `data/transactions.json` — canonical signed transactions
+
+### 3. Build the blockchain
+
+```bash
+# Default: difficulty=2, batch-size=10
+npm run build:chain
+
+# Custom difficulty / batch
+node scripts/build-chain.js --difficulty=3 --batch-size=20
+```
+
+Outputs `data/chain.json`.
+
+### 4. Start a single node
+
+```bash
 npm start
+# or
+node src/server.js --port=3001
 ```
 
-OR
+Open **http://localhost:3001** in your browser.
 
-```
-./bin/www
-```
-#For windows: if the above command didn't work, use this (make sure you have Node.js installed in your system):
-```
-node ./bin/www      
-```
+---
 
-Point a web browser at the demo:
+## Running 3 Nodes
 
-```
-http://localhost:3000
-```
+```bash
+# Terminal 1
+npm run dev:node -- --port=3001 --peers=http://localhost:3002,http://localhost:3003
 
-## Setup using Docker
+# Terminal 2
+npm run dev:node -- --port=3002 --peers=http://localhost:3001,http://localhost:3003
 
-Get the code:
-
-```
-git clone https://github.com/anders94/blockchain-demo.git
+# Terminal 3
+npm run dev:node -- --port=3003 --peers=http://localhost:3001,http://localhost:3002
 ```
 
-Run the Docker setup:
+---
 
-```
-cd blockchain-demo
-docker-compose up -d
-```
+## Fork Simulation
 
-Point a web browser at the demo:
+With all 3 nodes running:
 
-```
-http://localhost:3000
+```bash
+npm run simulate:fork
 ```
 
-## Optional Configuration
-You can adjust the "number of zeros" required by the demo by editing the first two lines of
-`public/javascripts/blockchain.js`.
+This demonstrates fork creation and resolution via the heaviest-chain rule.
 
-Because there are 16 possible characters in a hex value, each time you increment the difficulty
-by one you make the puzzle 16 times harder. In my testing, a difficulty of 6 requires a
-maximumNonce well over 500,000,000.
+---
 
-If you adjust the difficulty above 4, blocks will show up as not mined because the demo data
-assumes 4 zeros for a signed block. For example, on the `http://localhost:3000/block` page
-with a difficulty of 6, the first nonce that works is `8719932` yielding a hash of
-`000000669445c22167511857d8f3b822b331c3342f25dfdcb326e35c1a7aa267`. This gets out of hand fairly
-quickly though. Here's some time estimates at the various thresholds.
+## Running Tests
 
-|digits|nonce|time estimate|
-|------|-------|-------------|
-|4|500,000|15 minutes
-|5|8,000,000|4 hours
-|6|128,000,000|3 days
-|7|2,048,000,000|a month
-|8|32,768,000,000|2 years
-|9|524,288,000,000|30 years
-|10|8,388,608,000,000|481 years
-|11|134,217,728,000,000|7,690 years
-|12|2,147,483,648,000,000|123,036 years
-|13|34,359,738,368,000,000|1,968,581 years
-|14|549,755,813,888,000,000|31,497,291 years
-|15|8,796,093,022,208,000,000|503,956,662 years
+```bash
+npm test
+```
 
-In the production bitcoin blockchain, block `458,091` has the hash digest
-`00000000000000000000011246f099d94f91628d71c9d75ad2f9a06e2beb7e92`. That's 21 zeros in a row!
-That one block would take this software approximately 8,454,989,768,407,765 years to mine.
+21 unit tests covering:
+- Transaction normalization & determinism
+- Merkle tree (proof generation, verification, odd-length, single-leaf)
+- Block mining, PoW validation, tamper detection
+- ECDSA signing and verification
+- Full blockchain integration (append, validate, find tx, Merkle proof, tamper detection, fork resolution)
 
-### Public Private Key Demo
+---
 
-The 2nd part of the 101 session:
-* https://github.com/anders94/public-private-key-demo
+## REST API Reference
 
-## Send Thanks
+Base URL: `http://localhost:3001/api`
 
-![](public/images/qr.png)
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/chain` | All block headers |
+| `GET` | `/block/:hash` | Full block with transactions |
+| `GET` | `/block/index/:index` | Block by index |
+| `GET` | `/tx/:txHash` | Single transaction |
+| `GET` | `/proof/:txHash` | Merkle inclusion proof |
+| `POST` | `/verify` | Verify tx + proof (stateless) |
+| `GET` | `/search` | Search transactions (`location`, `drone_model`, `department`, `date_from`, `date_to`) |
+| `GET` | `/stats` | Chain statistics |
+| `POST` | `/validate` | Full chain validation |
 
-Bitcoin gratefully accepted: `1K3NvcuZzVTueHW1qhkG2Cm3viRkh2EXJp`
+### Example: verify a transaction
+
+```bash
+# Get the proof
+curl http://localhost:3001/api/proof/<txHash>
+
+# Verify it
+curl -X POST http://localhost:3001/api/verify \
+  -H 'Content-Type: application/json' \
+  -d '{"txHash":"<txHash>","proof":[...],"merkleRoot":"<root>"}'
+```
+
+---
+
+## Project Structure
+
+```
+blockchain-uav/
+├── scripts/
+│   ├── ingest.js          # Download + normalize dataset
+│   ├── build-chain.js     # Mine chain from transactions
+│   ├── keygen.js          # Generate key pairs
+│   └── simulate-fork.js   # Fork resolution demo
+├── src/
+│   ├── tx/
+│   │   └── normalize.js   # Canonical transaction builder
+│   ├── chain/
+│   │   ├── block.js       # Block structure + PoW mining
+│   │   ├── blockchain.js  # Chain management + fork resolution
+│   │   └── merkle.js      # Merkle tree, proof gen/verify
+│   ├── crypto/
+│   │   ├── keys.js        # ECDSA P-256 key management
+│   │   └── sign.js        # Sign + verify transactions
+│   ├── api/
+│   │   └── routes.js      # REST API routes
+│   ├── p2p/
+│   │   └── node.js        # P2P peer networking
+│   └── server.js          # Express server entry point
+├── public/
+│   └── index.html         # Explorer UI (Dataset / Block / Verify)
+├── tests/
+│   └── chain.test.js      # 21 unit tests
+├── docs/
+│   ├── data_dictionary.md
+│   ├── key_management.md
+│   └── network.md
+├── data/                  # (gitignored) raw snapshots + chain
+├── keys/                  # (gitignored) private keys
+└── README.md
+```
+
+---
+
+## Design Decisions
+
+### Canonicalization
+Keys are sorted lexicographically at every nesting level; compact JSON (no whitespace); timestamps normalised to ISO-8601 UTC without milliseconds; absent/empty fields stored as `null` rather than omitted. This guarantees bit-identical output for identical input regardless of insertion order or runtime environment.
+
+### Fork Choice
+Heaviest chain (sum of `16^difficulty` per block). Falls back to longest chain on tie. The candidate chain is fully validated before acceptance — a peer cannot force a chain replacement with an invalid chain.
+
+### Crypto
+ECDSA/P-256 with SHA-256. Signatures are DER-encoded and hex-stored. Public keys are stored as DER SPKI hex inside transactions (compact, no PEM headers). Node.js built-in `crypto` — no third-party crypto dependency.
+
+### Merkle Tree
+Binary tree; leaves are `SHA-256(txHash)` (single hash — domain-separated from block hashes); odd-length layers duplicate the last node. Proof paths record `{ hash, position }` for each sibling.
+
+---
+
+## Academic Integrity
+
+- All blockchain logic (hashing, PoW, Merkle, signing, P2P, fork resolution) is original implementation.
+- The UI visual style and layout is adapted from `anders94/blockchain-demo`.
+- Standard Node.js built-ins (`crypto`, `http`, `fs`) and utility libraries (`express`, `xml2js`, `csv-parse`) are used; no full blockchain frameworks.
