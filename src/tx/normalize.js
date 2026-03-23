@@ -80,17 +80,17 @@ function buildTransaction(raw, sourceUrl, snapshotHash) {
   const flightId = rawId ? String(rawId).trim() : null;
 
   const tx = {
-    authorized_use:                clean(get('authorized_use', 'Authorized_Use', 'authorizedUse')),
-    department:                    clean(get('department', 'Department')),
-    drone_make_model:              clean(get('drone_make_model', 'Drone_Make_Model', 'droneMakeModel')),
-    faa_drone_reg:                 cleanUpper(get('faa_drone_reg', 'Faa_Drone_Reg', 'faaDroneReg')),
+    authorized_use:                clean(get('Authorized Use: Select All that Apply','authorized_use','Authorized_Use')),
+    department:                    clean(get('Department:','department','Department')),
+    drone_make_model:              clean(get('Drone Make \u0026 Model:','drone_make_model','Drone_Make_Model')),
+    faa_drone_reg:                 cleanUpper(get('FAA Provided Drone Registration Number:','faa_drone_reg','Faa_Drone_Reg')),
     flight_id:                     flightId,
-    location_area_surveyed:        clean(get('location_area_surveyed', 'Location_Area_Surveyed')),
-    pilot_certificate:             cleanUpper(get('pilot_certificate', 'Pilot_Certificate', 'pilotCertificate')),
+    location_area_surveyed:        clean(get('Location (Area Surveyed):','location_area_surveyed','Location_Area_Surveyed')),
+    pilot_certificate:             cleanUpper(get('FAA provided commercial pilot certificate number:','pilot_certificate','Pilot_Certificate')),
     snapshot_hash:                 snapshotHash,
     source_url:                    sourceUrl,
-    street_address_area_surveyed:  clean(get('street_address_area_surveyed', 'Street_Address_Area_Surveyed')),
-    timestamp:                     normaliseDate(get('date', 'Date', 'timestamp', 'Timestamp', 'flight_date')),
+    street_address_area_surveyed:  clean(get('Street Address (Area Surveyed):','street_address_area_surveyed','Street_Address_Area_Surveyed')),
+    timestamp:                     normaliseDate(get('Start Date:','Timestamp','date','Date','timestamp')),
     tx_version:                    1,
   };
 

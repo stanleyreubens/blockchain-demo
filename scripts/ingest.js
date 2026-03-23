@@ -98,8 +98,37 @@ async function parseJson(body) {
   throw new Error('Unrecognised JSON structure from dataset');
 }
 
-async function ingest(format = 'xml') {
+async function ingest(format = 'csv', localFile = null) {
   // Ensure both XML and CSV are downloaded (requirement: support 2+ formats)
+  // If a local file is provided, skip download entirely
+  if (localFile) {
+    console.log('[ingest] Loading local file:', localFile);
+    const body = fs.readFileSync(localFile, 'utf8');
+    const snapshotHash = sha256(body);
+    const fmt = localFile.endsWith('.csv') ? 'csv' : localFile.endsWith('.json') ? 'json' : 'xml';
+    let records;
+    if (fmt === 'csv')       records = parseCsvBody(body);
+    else if (fmt === 'json') records = await parseJson(body);
+    else                     records = await parseXml(body);
+    console.log('[ingest] Parsed', records.length, 'records from local', fmt.toUpperCase());
+
+    const issuer = getOrCreateKeyPair('CityIssuer');
+    const signedTxs = [];
+    let skipped = 0;
+    for (const raw of records) {
+      try {
+        const { tx, txJson, txHash } = buildTransaction(raw, localFile, snapshotHash);
+        const signature = signTransaction(txHash, issuer.privateKeyPem);
+        signedTxs.push({ tx, txJson, txHash, signature, issuerPublicKey: issuer.publicKeyHex });
+      } catch(e) { skipped++; if (skipped <= 3) console.warn('[ingest] Skipped:', e.message); }
+    }
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    const outFile = path.join(DATA_DIR, 'transactions.json');
+    fs.writeFileSync(outFile, JSON.stringify(signedTxs, null, 2), 'utf8');
+    console.log('[ingest] Wrote', signedTxs.length, 'signed transactions ->', outFile);
+    return signedTxs;
+  }
+
   const formats = format === 'both' ? ['xml', 'csv'] : [format];
   let records = [];
   let primaryUrl, snapshotHash;
@@ -167,9 +196,11 @@ async function ingest(format = 'xml') {
 if (require.main === module) {
   const args   = process.argv.slice(2);
   const fmtArg = args.find(a => a.startsWith('--format=')) || '--format=xml';
-  const format = fmtArg.split('=')[1] || 'xml';
+  const format = fmtArg.split('=')[1] || 'csv';
+  const fileArg = args.find(a => a.startsWith('--file='));
+  const localFile = fileArg ? fileArg.split('=').slice(1).join('=') : null;
 
-  ingest(format)
+  ingest(format, localFile)
     .then(txs => console.log(`[ingest] Done. ${txs.length} transactions ready.`))
     .catch(e  => { console.error('[ingest] FATAL:', e.message); process.exit(1); });
 }
